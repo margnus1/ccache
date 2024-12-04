@@ -15,8 +15,18 @@ EOF
     cat <<EOF >dir1/include/test.h
 int test;
 EOF
+    cat <<EOF >dir1/src/samedir.c
+#include <stdarg.h>
+#ifndef NOT_DEFINED
+  #include "samedir.h"
+#endif
+EOF
+    cat <<EOF >dir1/src/samedir.h
+int test2;
+EOF
     cp -r dir1 dir2
     backdate dir1/include/test.h dir2/include/test.h
+    backdate dir1/src/samedir.h dir2/src/samedir.h
 }
 
 SUITE_basedir() {
@@ -428,4 +438,19 @@ fi
     expect_stat cache_miss 1
     expect_contains test.d test.o:
     expect_content_pattern test.d "test.o:*"
+
+    # -------------------------------------------------------------------------
+    TEST "Indented include from same directory"
+
+    cd dir1
+    CCACHE_NODIRECT=1 CCACHE_BASEDIR="`pwd`" $CCACHE_COMPILE -c src/samedir.c
+    expect_stat direct_cache_hit 0
+    expect_stat preprocessed_cache_hit 0
+    expect_stat cache_miss 1
+
+    cd ../dir2
+    CCACHE_NODIRECT=1 CCACHE_BASEDIR="`pwd`" $CCACHE_COMPILE -c src/samedir.c
+    expect_stat direct_cache_hit 0
+    expect_stat preprocessed_cache_hit 1
+    expect_stat cache_miss 1
 }
